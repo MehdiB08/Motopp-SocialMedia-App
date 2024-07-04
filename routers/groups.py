@@ -10,7 +10,7 @@ from db.models import DbGroup
 router = APIRouter( prefix="/groups", tags=["groups"])
 
 
-@router.post("/groups/", response_model=GroupDisplay)
+@router.post('', response_model=GroupDisplay)
 def create_group(group: GroupCreate, db: Session = Depends(get_db), current_user: UserAuth = Depends(get_current_user)):
     db_group = DbGroup(name=group.name, description=group.description, owner_id=current_user.id)
     db.add(db_group)
@@ -18,18 +18,35 @@ def create_group(group: GroupCreate, db: Session = Depends(get_db), current_user
     db.refresh(db_group)
     return db_group
 
-@router.post("/groups/{group_id}/join", response_model=GroupDisplay)
-def join_group(group_id: int, db: Session = Depends(get_db), current_user: UserAuth = Depends(get_current_user)):
-    group = db.query(DbGroup).filter(DbGroup.id == group_id).first()
+@router.post("/{id}/members", response_model=GroupDisplay)
+def join_group(id: int, db: Session = Depends(get_db), current_user: UserAuth = Depends(get_current_user)):
+    group = db.query(DbGroup).filter(DbGroup.id == id).first()
     if not group:
         raise HTTPException(status_code=404, detail="Group not found")
     group.members.append(current_user)
     db.commit()
     return group
 
-@router.get("/groups/{group_id}/members", response_model=List[UserDisplay])
+@router.get("/{group_id}/members", response_model=List[UserDisplay])
 def list_group_members(group_id: int, db: Session = Depends(get_db), current_user: UserAuth = Depends(get_current_user)):
     group = db.query(DbGroup).filter(DbGroup.id == group_id).first()
     if not group:
         raise HTTPException(status_code=404, detail="Group not found")
     return group.members
+
+@router.delete('/{id}/member/{member_id}', status_code=204)
+def leave_group(
+    id: int, 
+    db: Session = Depends(get_db), 
+    current_user: UserAuth = Depends(get_current_user)
+):
+    group = db.query(DbGroup).filter(DbGroup.id == id).first()
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found")
+
+    if current_user not in group.members:
+        raise HTTPException(status_code=400, detail="You are not a member of this group")
+
+    group.members.remove(current_user)
+    db.commit()
+    return group

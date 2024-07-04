@@ -24,11 +24,11 @@ def create(request: PostBase, db: Session = Depends(get_db), current_user: UserA
     if not request.image_url_type in image_url_types:
         raise HTTPException(status_code = status.HTTP_422_UNPROCESSABLE_ENTITY, 
                             detail = "Parameter image_url_type can only take values 'absolute' or 'relative'.")
+    if request.creator_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Creator ID must match the current user ID")
     return db_post.create(db, request)
-
-@router.get('/all', response_model=List[PostDisplay])
-def posts(db: Session = Depends(get_db)):
-    return db_post.get_all(db)
 
 @router.post('/image')
 def upload_image(image: UploadFile = File(...), current_user: UserAuth = Depends(get_current_user)):
@@ -43,6 +43,6 @@ def upload_image(image: UploadFile = File(...), current_user: UserAuth = Depends
         return {'filename': path}
     
 
-@router.delete('/{id}') # id of the post
+@router.delete('/{id}', status_code=204) # id of the post
 def delete(id: int, db:Session = Depends(get_db), current_user: UserAuth = Depends(get_current_user)):
     return db_post.delete(db, id, current_user.id)
